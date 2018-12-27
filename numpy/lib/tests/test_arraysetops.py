@@ -197,8 +197,8 @@ class TestSetOps(object):
             b = np.asarray(b).flatten().tolist()
             return a in b
         isin_slow = np.vectorize(_isin_slow, otypes=[bool], excluded={1})
-        def assert_isin_equal(a, b):
-            x = isin(a, b)
+        def assert_isin_equal(a, b, old_algorithm=None):
+            x = isin(a, b, _slow_integer=old_algorithm)
             y = isin_slow(a, b)
             assert_array_equal(x, y)
 
@@ -206,28 +206,39 @@ class TestSetOps(object):
         a = np.arange(24).reshape([2, 3, 4])
         b = np.array([[10, 20, 30], [0, 1, 3], [11, 22, 33]])
         assert_isin_equal(a, b)
+        assert_isin_equal(a, b, old_algorithm=True)
 
         #array-likes as both arguments
         c = [(9, 8), (7, 6)]
         d = (9, 7)
         assert_isin_equal(c, d)
+        assert_isin_equal(c, d, old_algorithm=True)
 
         #zero-d array:
         f = np.array(3)
         assert_isin_equal(f, b)
         assert_isin_equal(a, f)
         assert_isin_equal(f, f)
+        assert_isin_equal(f, b, old_algorithm=True)
+        assert_isin_equal(a, f, old_algorithm=True)
+        assert_isin_equal(f, f, old_algorithm=True)
 
         #scalar:
         assert_isin_equal(5, b)
         assert_isin_equal(a, 6)
         assert_isin_equal(5, 6)
+        assert_isin_equal(5, b, old_algorithm=True)
+        assert_isin_equal(a, 6, old_algorithm=True)
+        assert_isin_equal(5, 6, old_algorithm=True)
 
         #empty array-like:
         x = []
         assert_isin_equal(x, b)
         assert_isin_equal(a, x)
         assert_isin_equal(x, x)
+        assert_isin_equal(x, b, old_algorithm=True)
+        assert_isin_equal(a, x, old_algorithm=True)
+        assert_isin_equal(x, x, old_algorithm=True)
 
     def test_in1d(self):
         # we use two different sizes for the b array here to test the
@@ -239,15 +250,21 @@ class TestSetOps(object):
             ec = np.array([True, False, True, True])
             c = in1d(a, b, assume_unique=True)
             assert_array_equal(c, ec)
+            c = in1d(a, b, assume_unique=True, _slow_integer=True)
+            assert_array_equal(c, ec)
 
             a[0] = 8
             ec = np.array([False, False, True, True])
             c = in1d(a, b, assume_unique=True)
             assert_array_equal(c, ec)
+            c = in1d(a, b, assume_unique=True, _slow_integer=True)
+            assert_array_equal(c, ec)
 
             a[0], a[3] = 4, 8
             ec = np.array([True, False, True, False])
             c = in1d(a, b, assume_unique=True)
+            assert_array_equal(c, ec)
+            c = in1d(a, b, assume_unique=True, _slow_integer=True)
             assert_array_equal(c, ec)
 
             a = np.array([5, 4, 5, 3, 4, 4, 3, 4, 3, 5, 2, 1, 5, 5])
@@ -256,11 +273,15 @@ class TestSetOps(object):
                   False, True, False, False, False]
             c = in1d(a, b)
             assert_array_equal(c, ec)
+            c = in1d(a, b, _slow_integer=True)
+            assert_array_equal(c, ec)
 
             b = b + [5, 5, 4] * mult
             ec = [True, True, True, True, True, True, True, True, True, True,
                   True, False, True, True]
             c = in1d(a, b)
+            assert_array_equal(c, ec)
+            c = in1d(a, b, _slow_integer=True)
             assert_array_equal(c, ec)
 
             a = np.array([5, 7, 1, 2])
@@ -268,11 +289,15 @@ class TestSetOps(object):
             ec = np.array([True, False, True, True])
             c = in1d(a, b)
             assert_array_equal(c, ec)
+            c = in1d(a, b, _slow_integer=True)
+            assert_array_equal(c, ec)
 
             a = np.array([5, 7, 1, 1, 2])
             b = np.array([2, 4, 3, 3, 1, 5] * mult)
             ec = np.array([True, False, True, True, True])
             c = in1d(a, b)
+            assert_array_equal(c, ec)
+            c = in1d(a, b, _slow_integer=True)
             assert_array_equal(c, ec)
 
             a = np.array([5, 5])
@@ -280,11 +305,15 @@ class TestSetOps(object):
             ec = np.array([False, False])
             c = in1d(a, b)
             assert_array_equal(c, ec)
+            c = in1d(a, b, _slow_integer=True)
+            assert_array_equal(c, ec)
 
         a = np.array([5])
         b = np.array([2])
         ec = np.array([False])
         c = in1d(a, b)
+        assert_array_equal(c, ec)
+        c = in1d(a, b, _slow_integer=True)
         assert_array_equal(c, ec)
 
         assert_array_equal(in1d([], []), [])
@@ -375,6 +404,8 @@ class TestSetOps(object):
             a = np.array([5, 4, 5, 3, 4, 4, 3, 4, 3, 5, 2, 1, 5, 5])
             b = [2, 3, 4] * mult
             assert_array_equal(np.invert(in1d(a, b)), in1d(a, b, invert=True))
+            assert_array_equal(np.invert(in1d(a, b)),
+                               in1d(a, b, invert=True, _slow_integer=True))
 
         for mult in (1, 10):
             a = np.array([5, 4, 5, 3, 4, 4, 3, 4, 3, 5, 2, 1, 5, 5],
@@ -382,6 +413,8 @@ class TestSetOps(object):
             b = [2, 3, 4] * mult
             b = np.array(b, dtype=np.float32)
             assert_array_equal(np.invert(in1d(a, b)), in1d(a, b, invert=True))
+            assert_array_equal(np.invert(in1d(a, b)),
+                               in1d(a, b, invert=True, _slow_integer=True))
 
     def test_in1d_ravel(self):
         # Test that in1d ravels its input arrays. This is not documented
@@ -395,10 +428,15 @@ class TestSetOps(object):
         assert_array_equal(in1d(a, b, assume_unique=False), ec)
         assert_array_equal(in1d(a, long_b, assume_unique=True), ec)
         assert_array_equal(in1d(a, long_b, assume_unique=False), ec)
+        assert_array_equal(in1d(a, b, assume_unique=True, _slow_integer=True), ec)
+        assert_array_equal(in1d(a, b, assume_unique=False, _slow_integer=True), ec)
+        assert_array_equal(in1d(a, long_b, assume_unique=True, _slow_integer=True), ec)
+        assert_array_equal(in1d(a, long_b, assume_unique=False, _slow_integer=True), ec)
 
     def test_in1d_hit_alternate_algorithm(self):
         """Hit the standard isin code with integers"""
         # Need extreme range to hit standard code
+        # This hits it without the use of _slow_integer
         a = np.array([5, 4, 5, 3, 4, 4, 1e9], dtype=np.int64)
         b = np.array([2, 3, 4, 1e9], dtype=np.int64)
         expected = np.array([0, 1, 0, 1, 1, 1, 1], dtype=np.bool)
@@ -417,7 +455,9 @@ class TestSetOps(object):
         b = np.array([False, False, False])
         expected = np.array([False, True])
         assert_array_equal(expected, in1d(a, b))
+        assert_array_equal(expected, in1d(a, b, _slow_integer=True))
         assert_array_equal(np.invert(expected), in1d(a, b, invert=True))
+        assert_array_equal(np.invert(expected), in1d(a, b, invert=True, _slow_integer=True))
 
     def test_in1d_first_array_is_object(self):
         ar1 = [None]
